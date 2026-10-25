@@ -25,7 +25,11 @@ export const searchPokemon = async (limit = 20, offset = 0) => {
     };
 
     const data = await response.json();
-    return (data.results).map(mapPokemonList);
+    return {
+        pokemons: data.results.map(mapPokemonList),
+        hasMore: Boolean(data.next),
+        nextOffset: offset + limit
+    };
 };
 
 export const getPokemonDetails = async (query) => {
@@ -34,10 +38,11 @@ export const getPokemonDetails = async (query) => {
 
     const response = await fetch(url);
 
-    if(!response.ok){
-        throw new Error (`Error http ${response.status}`)
-    };
+    if (!response.ok) {
+        throw new Error(`Error http ${response.status}`);
+    }
 
     const data = await response.json();
+
     return data;
 };

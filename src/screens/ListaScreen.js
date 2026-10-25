@@ -1,19 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import {
-    ActivityIndicator,
-    Button,
-    FlatList,
-    StyleSheet,
-    Text,
-    TextInput,
-    View
-} from 'react-native';
+import { ActivityIndicator, Button, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import PokemonCard from '../components/PokemonCard';
-import {
-    getPokemonDetails,
-    searchPokemon
-} from '../services/pokeAPI';
+import { getPokemonDetails, searchPokemon } from '../services/pokeAPI';
 
 export default function ListaScreen({ navigation }) {
     // useState: guarda los Pokémon y los estados de la petición.
@@ -21,6 +10,12 @@ export default function ListaScreen({ navigation }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [retryCount, setRetryCount] = useState(0);
+
+    // Estados de pagina.
+    const [offset, setOffset] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [loadMoreError, setLoadMoreError] = useState('');
 
     // useState: controla la búsqueda y sus resultados.
     const [query, setQuery] = useState('');
@@ -35,14 +30,16 @@ export default function ListaScreen({ navigation }) {
         const loadPokemons = async () => {
             setLoading(true);
             setError('');
+            setLoadMoreError('');
 
             try {
-                // async/await: espera la respuesta de la API.
-                // La petición está separada en el archivo de servicios.
-                const data = await searchPokemon(20, 0);
+                // La API devuelve pokemons, hasMore y nextOffset.
+                const result = await searchPokemon(20, 0);
 
                 if (active) {
-                    setPokemons(data);
+                    setPokemons(result.pokemons);
+                    setOffset(result.nextOffset);
+                    setHasMore(result.hasMore);
                 }
             } catch (err) {
                 if (active) {
@@ -53,7 +50,6 @@ export default function ListaScreen({ navigation }) {
                     console.log('Error cargando Pokémon:', err);
                 }
             } finally {
-                // finally: termina la carga aunque haya éxito o error.
                 if (active) {
                     setLoading(false);
                 }
@@ -62,11 +58,46 @@ export default function ListaScreen({ navigation }) {
 
         loadPokemons();
 
-        // Limpieza: ignora el resultado si la pantalla se desmonta.
+        // Limpieza: ignora la respuesta si la pantalla se desmonta.
         return () => {
             active = false;
         };
     }, [retryCount]);
+
+    // Carga otros 20 Pokémon cuando se llega al final.
+    const loadMorePokemons = async () => {
+        // Evita peticiones duplicadas.
+        if (
+            loading || loadingMore || !hasMore || searchResults !== null
+        ) {
+            return;
+        }
+
+        setLoadingMore(true);
+        setLoadMoreError('');
+
+        try {
+            const result = await searchPokemon(20, offset);
+
+            setPokemons((currentPokemons) => [
+                ...currentPokemons,
+                ...result.pokemons
+            ]);
+
+            setOffset(result.nextOffset);
+            setHasMore(result.hasMore);
+        } catch (err) {
+            setLoadMoreError(
+                'No pudimos cargar más Pokémon. Intenta nuevamente.'
+            );
+
+            console.log('Error cargando más Pokémon:', err);
+        } finally {
+            setLoadingMore(false);
+        }
+    };
+
+
 
     // async/await: busca un Pokémon por nombre o número.
     const handleSearch = async () => {
@@ -140,6 +171,36 @@ export default function ListaScreen({ navigation }) {
         );
     }
 
+    // Muestra el estado de la carga adicional.
+    const renderFooter = () => {
+        if (loadingMore) {
+            return (
+                <View style={styles.footer}>
+                    <ActivityIndicator color="#EF5350" />
+                    <Text style={styles.footerText}>
+                        Cargando más Pokémon...
+                    </Text>
+                </View>
+            );
+        }
+
+        if (loadMoreError) {
+            return (
+                <View style={styles.footer}>
+                    <Text style={styles.footerText}>
+                        {loadMoreError}
+                    </Text>
+                    <Button
+                        title="Reintentar"
+                        color="#EF5350"
+                        onPress={loadMorePokemons}
+                    />
+                </View>
+            );
+        }
+        return null;
+    };
+
     return (
         <View style={styles.container}>
             {/* TextInput: recibe nombre o número sin autocorrección. */}
@@ -151,7 +212,6 @@ export default function ListaScreen({ navigation }) {
                     editable={!searching}
                     onChangeText={(text) => {
                         setQuery(text);
-
                         // Al borrar la búsqueda, recuperamos el catálogo.
                         if (!text.trim()) {
                             setSearchResults(null);
@@ -193,7 +253,7 @@ export default function ListaScreen({ navigation }) {
                 </View>
             )}
 
-            {/* FlatList: muestra las tarjetas en una cuadrícula de dos columnas. */}
+            {/* FlatList: muestra las tarjetas en una cuadrícula de dos columnas, y permite scroll infinito. */}
             <FlatList
                 data={searchResults ?? pokemons}
                 numColumns={2}
@@ -209,6 +269,8 @@ export default function ListaScreen({ navigation }) {
                     />
                 )}
                 contentContainerStyle={styles.list}
+                onEndReached={loadMorePokemons}
+                onEndReachedThreshold={0.5}
                 ListEmptyComponent={
                     <Text style={styles.message}>
                         {searchResults !== null
@@ -216,7 +278,9 @@ export default function ListaScreen({ navigation }) {
                             : 'No hay Pokémon para mostrar.'}
                     </Text>
                 }
+                ListFooterComponent={renderFooter}
             />
+
         </View>
     );
 }
@@ -262,5 +326,14 @@ const styles = StyleSheet.create({
     list: {
         padding: 8,
         paddingBottom: 24
+    },
+    footer: {
+        alignItems: 'center',
+        padding: 16
+    },
+    footerText: {
+        textAlign: 'center',
+        color: '#555555',
+        marginVertical: 8
     }
 });
