@@ -22,8 +22,22 @@ export const searchPokemon = async (limit = 20, offset = 0) => {
 
     if(!response.ok){
         throw new Error (`Error http ${response.status}`)
-    }
+    };
 
     const data = await response.json();
     return (data.results).map(mapPokemonList);
-}
+};
+
+export const getPokemonDetails = async (query) => {
+    const cleanParameter = String(query).trim().toLowerCase();
+    const url = `${BASE_URL}/pokemon/${cleanParameter}`;
+
+    const response = await fetch(url);
+
+    if(!response.ok){
+        throw new Error (`Error http ${response.status}`)
+    };
+
+    const data = await response.json();
+    return data;
+};
