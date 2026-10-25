@@ -13,7 +13,7 @@ export default function PokemonCard({ pokemon, onPress }) {
             onPress={onPress}
         >
             <Image
-                source={{ uri : `#${String(pokemon.image)}`}}
+                source={{ uri: pokemon.image }}
                 style={styles.image}
             />
             <Text style={styles.idText}>{formattedId}</Text>
@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
         height: 100,
         marginBottom: 8
     },
-    text:{
+    idText: {
         fontSize: 12,
         color: '#666666',
         fontWeight: '500',
